@@ -3,6 +3,7 @@ name = "backend"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.0",
     "asyncpg>=0.32.0",
     "fastapi>=0.148.0",
     "httpx>=0.28.1",
