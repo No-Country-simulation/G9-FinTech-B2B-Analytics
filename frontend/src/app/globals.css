@@ -10,6 +10,23 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-ink: #1c1d2b;
+  --color-ink-soft: #5c5e73;
+  --color-navy: #14163a;
+  --brand: #4a5bdb;
+  --brand-deep: #3b4bc8;
+  --color-periwinkle: #aeb8ff;
+  --color-lilac: #e9ecfc;
+  --color-line-soft: #c3c8ee;
+  --color-periwinkle-soft: #a9aed6;
+  --color-line: #cfd2e6;
+  --color-line-dark: #343761;
+  --color-danger-bg: #fbe9ef;
+  --color-danger-ink: #8e2447;
+
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-newsreader);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +39,16 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #4a5bdb;
+  outline-offset: 3px;
+}
+
+input:focus {
+  border-color: #4a5bdb;
 }
