@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     sesion_duracion_max_horas: int = 12
     token_definir_horas: int = 72
     token_restablecer_minutos: int = 60
+    token_cambio_correo_minutos: int = 30
 
     # Frontend
     frontend_url: str = "http://localhost:5173"

@@ -1,9 +1,12 @@
 from pydantic import (
     BaseModel,
     ConfigDict,
+    EmailStr,
     Field,
     field_validator,
 )
+
+from app.schemas.comunes import Password
 
 
 class DatosCuentaActualizar(BaseModel):
@@ -37,3 +40,28 @@ class DatosCuentaSalida(BaseModel):
 
     nombre: str
     empresa: str
+
+
+class CambiarContrasenaEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contrasena_actual: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+
+    contrasena_nueva: Password = Field(
+        max_length=128,
+    )
+
+class CambiarCorreoEntrada(BaseModel):
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
+
+    nuevo_correo: EmailStr = Field(max_length=254)
+    contrasena_actual: str = Field(
+        min_length=1,
+        max_length=128,
+    )

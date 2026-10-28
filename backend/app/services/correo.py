@@ -76,3 +76,32 @@ async def enviar_smtp(para: str, asunto: str, texto: str, cuerpo_html: str) -> N
         password=settings.smtp_password,
         start_tls=settings.smtp_tls,
     )
+
+async def encolar_confirmacion_cambio_correo(
+    cola: ColaDeTareas,
+    nombre: str,
+    correo_nuevo: str,
+    token: str,
+) -> bool:
+    enlace = f"{settings.frontend_url}/confirmar-correo/{token}"
+
+    intro = (
+        "Solicitaste cambiar el correo de tu cuenta de PriceScope. "
+        "Confirmá tu nueva dirección con este enlace "
+        f"(vence en {settings.token_cambio_correo_minutos} minutos):"
+    )
+
+    texto, cuerpo = _armar(
+        nombre,
+        intro,
+        enlace,
+        "Confirmar mi nuevo correo",
+    )
+
+    return await _encolar(
+        cola,
+        correo_nuevo,
+        "Confirmá tu nuevo correo de PriceScope",
+        texto,
+        cuerpo,
+    )
