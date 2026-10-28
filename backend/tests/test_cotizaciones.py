@@ -10,6 +10,8 @@ from app.core.database import SessionLocal
 from app.models import Cotizacion, TipoCotizacion
 from app.services import cotizaciones
 from app.services.cotizaciones import ErrorFuente
+from app.workers import tareas
+from app.workers.tareas import WorkerSettings
 from tests.conftest import bearer
 
 
@@ -92,3 +94,20 @@ async def test_endpoint_devuelve_ultima_cotizacion_solo_a_admin(
     respuesta = await client.get(url, headers=bearer(token_admin))
     assert respuesta.status_code == 200
     assert respuesta.json()[0]["tipo"] == "blue"
+
+
+async def test_job_guarda_cotizaciones() -> None:
+    async with cliente(respuesta_dolarapi) as http:
+        assert await tareas.ingestar_cotizaciones({"http": http}) == 2
+
+
+async def test_job_no_falla_si_no_hay_fuente() -> None:
+    async with cliente(lambda request: httpx.Response(503)) as http:
+        assert await tareas.ingestar_cotizaciones({"http": http}) == 0
+
+
+def test_job_programado_cada_hora() -> None:
+    job = next(j for j in WorkerSettings.cron_jobs if j.coroutine is tareas.ingestar_cotizaciones)
+    assert job.minute == 0
+    assert job.hour is None  # sin restricción de hora: corre todas
+    assert not job.run_at_startup
