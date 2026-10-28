@@ -1,11 +1,16 @@
+from datetime import UTC, datetime
+from decimal import Decimal
+
 import httpx
 import pytest
+from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
-from app.models import Cotizacion
+from app.models import Cotizacion, TipoCotizacion
 from app.services import cotizaciones
 from app.services.cotizaciones import ErrorFuente
+from tests.conftest import bearer
 
 
 def cliente(handler) -> httpx.AsyncClient:
@@ -63,3 +68,27 @@ async def test_error_si_ninguna_fuente_responde() -> None:
         with pytest.raises(ErrorFuente):
             await cotizaciones.ingestar_cotizaciones(db, client)
         assert (await db.scalars(select(Cotizacion))).all() == []
+
+
+async def test_endpoint_devuelve_ultima_cotizacion_solo_a_admin(
+    client: AsyncClient, token_admin: str, token_cliente: str
+) -> None:
+    async with SessionLocal() as db:
+        db.add(
+            Cotizacion(
+                fuente="dolarapi",
+                tipo=TipoCotizacion.BLUE,
+                cotizado_en=datetime.now(UTC),
+                compra=Decimal("1555"),
+                venta=Decimal("1575"),
+            )
+        )
+        await db.commit()
+
+    url = "/api/v1/admin/cotizaciones"
+    assert (await client.get(url)).status_code == 401
+    assert (await client.get(url, headers=bearer(token_cliente))).status_code == 403
+
+    respuesta = await client.get(url, headers=bearer(token_admin))
+    assert respuesta.status_code == 200
+    assert respuesta.json()[0]["tipo"] == "blue"

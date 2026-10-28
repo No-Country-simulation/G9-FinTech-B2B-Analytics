@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -99,3 +100,13 @@ async def ingestar_cotizaciones(db: AsyncSession, client: httpx.AsyncClient) -> 
     await db.execute(insert(Cotizacion).values(filas).on_conflict_do_nothing())
     await db.commit()
     return len(filas)
+
+
+async def ultimas_cotizaciones(db: AsyncSession) -> list[Cotizacion]:
+    """La cotización más reciente de cada tipo."""
+    filas = await db.scalars(
+        select(Cotizacion)
+        .distinct(Cotizacion.tipo)
+        .order_by(Cotizacion.tipo, Cotizacion.cotizado_en.desc())
+    )
+    return list(filas)
