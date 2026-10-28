@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Cotizacion, TipoCotizacion
@@ -106,7 +106,7 @@ async def ultimas_cotizaciones(db: AsyncSession) -> list[Cotizacion]:
     """La cotización más reciente de cada tipo."""
     filas = await db.scalars(
         select(Cotizacion)
-        .distinct(Cotizacion.tipo)
+        .ext(distinct_on(Cotizacion.tipo))
         .order_by(Cotizacion.tipo, Cotizacion.cotizado_en.desc())
     )
     return list(filas)
