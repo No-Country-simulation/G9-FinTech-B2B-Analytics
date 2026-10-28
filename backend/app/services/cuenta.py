@@ -7,11 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.seguridad import generar_token_opaco, hash_token, hashear_password, verificar_password
-from app.models import CambioCorreo, EstadoUsuario, Sesion, Usuario
-from app.schemas.cuenta import CambiarContrasenaEntrada, CambiarCorreoEntrada, DatosCuentaActualizar
+from app.models import CambioCorreo, EstadoUsuario, Rol, Sesion, TokenAcceso, Usuario
+from app.schemas.cuenta import (
+    CambiarContrasenaEntrada,
+    CambiarCorreoEntrada,
+    DatosCuentaActualizar,
+    EliminarCuentaEntrada,
+)
 from app.services import correo
 from app.services.correo import ColaDeTareas
-from app.services.errores import Conflicto, ErrorNegocio
+from app.services.errores import Conflicto, ErrorNegocio, Prohibido
 
 
 async def actualizar_datos(
@@ -239,3 +244,77 @@ async def confirmar_cambio_correo(
     except IntegrityError:
         await db.rollback()
         raise Conflicto("El correo ya está registrado") from None
+
+#---DAR DE BAJA LA CUENTA---
+async def dar_de_baja_cuenta(
+    db: AsyncSession,
+    usuario: Usuario,
+    datos: EliminarCuentaEntrada,
+) -> None:
+    """Da de baja una cuenta de cliente y revoca sus accesos."""
+
+    cuenta = await db.scalar(
+        select(Usuario)
+        .where(Usuario.id == usuario.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+    if cuenta is None or cuenta.estado != EstadoUsuario.ACTIVO:
+        raise ErrorNegocio("La cuenta no está activa")
+
+    if cuenta.rol != Rol.CLIENTE:
+        raise Prohibido(
+            "Esta operación solo está disponible para clientes"
+        )
+
+    if cuenta.password_hash is None:
+        raise ErrorNegocio(
+            "La cuenta no tiene contraseña configurada"
+        )
+
+    valida = await asyncio.to_thread(
+        verificar_password,
+        datos.contrasena_actual,
+        cuenta.password_hash,
+    )
+
+    if not valida:
+        raise ErrorNegocio("La contraseña actual es incorrecta")
+
+    ahora = datetime.now(UTC)
+
+    # Cambiamos el estado de la cuenta.
+    cuenta.estado = EstadoUsuario.BAJA
+
+    # Revocamos todas sus sesiones.
+    await db.execute(
+        update(Sesion)
+        .where(
+            Sesion.usuario_id == cuenta.id,
+            Sesion.revocada_en.is_(None),
+        )
+        .values(revocada_en=ahora)
+    )
+
+    # Invalidamos los tokens de acceso pendientes.
+    await db.execute(
+        update(TokenAcceso)
+        .where(
+            TokenAcceso.usuario_id == cuenta.id,
+            TokenAcceso.usado_en.is_(None),
+        )
+        .values(usado_en=ahora)
+    )
+
+    # Invalidamos las solicitudes de cambio de correo.
+    await db.execute(
+        update(CambioCorreo)
+        .where(
+            CambioCorreo.usuario_id == cuenta.id,
+            CambioCorreo.usado_en.is_(None),
+        )
+        .values(usado_en=ahora)
+    )
+
+    await db.commit()

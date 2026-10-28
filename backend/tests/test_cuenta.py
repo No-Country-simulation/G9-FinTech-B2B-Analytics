@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.core.seguridad import hash_token
-from app.models import CambioCorreo
+from app.models import CambioCorreo, EstadoUsuario, Usuario
 from tests.conftest import ColaFalsa, bearer, crear_usuario_activo
 
 URL = "/api/v1/cuenta/datos"
@@ -529,3 +529,181 @@ async def test_nueva_solicitud_invalida_token_anterior(
     )
 
     assert respuesta_nueva.status_code == 200
+
+URL_ELIMINAR = "/api/v1/cuenta"
+
+DATOS_ELIMINACION = {
+    "contrasena_actual": "Prueba123",
+    "confirmacion": "ELIMINAR MI CUENTA",
+}
+
+
+async def test_eliminar_cuenta_correctamente(
+    client: AsyncClient,
+    token_cliente: str,
+) -> None:
+
+    respuesta = await client.request(
+        "DELETE",
+        URL_ELIMINAR,
+        json=DATOS_ELIMINACION,
+        headers=bearer(token_cliente),
+    )
+
+    assert respuesta.status_code == 200
+
+    # La cuenta permanece registrada, pero dada de baja.
+    async with SessionLocal() as db:
+        usuario = await db.scalar(
+            select(Usuario).where(
+                Usuario.correo == "cliente@example.com"
+            )
+        )
+
+        assert usuario is not None
+        assert usuario.estado == EstadoUsuario.BAJA
+
+    # El token anterior deja de funcionar.
+    yo = await client.get(
+        "/api/v1/auth/yo",
+        headers=bearer(token_cliente),
+    )
+
+    assert yo.status_code == 401
+
+    # La cuenta ya no puede iniciar sesión.
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "correo": "cliente@example.com",
+            "password": "Prueba123",
+        },
+    )
+
+    assert login.status_code == 401
+
+
+async def test_eliminar_contrasena_incorrecta(
+    client: AsyncClient,
+    token_cliente: str,
+) -> None:
+
+    datos = DATOS_ELIMINACION | {
+        "contrasena_actual": "Incorrecta123"
+    }
+
+    respuesta = await client.request(
+        "DELETE",
+        URL_ELIMINAR,
+        json=datos,
+        headers=bearer(token_cliente),
+    )
+
+    assert respuesta.status_code == 400
+
+    # El usuario debe continuar activo.
+    yo = await client.get(
+        "/api/v1/auth/yo",
+        headers=bearer(token_cliente),
+    )
+
+    assert yo.status_code == 200
+
+
+async def test_eliminar_sin_confirmacion_correcta(
+    client: AsyncClient,
+    token_cliente: str,
+) -> None:
+
+    datos = DATOS_ELIMINACION | {
+        "confirmacion": "ELIMINAR"
+    }
+
+    respuesta = await client.request(
+        "DELETE",
+        URL_ELIMINAR,
+        json=datos,
+        headers=bearer(token_cliente),
+    )
+
+    assert respuesta.status_code == 422
+
+    yo = await client.get(
+        "/api/v1/auth/yo",
+        headers=bearer(token_cliente),
+    )
+
+    assert yo.status_code == 200
+
+
+async def test_eliminar_sin_autenticacion(
+    client: AsyncClient,
+) -> None:
+
+    respuesta = await client.request(
+        "DELETE",
+        URL_ELIMINAR,
+        json=DATOS_ELIMINACION,
+    )
+
+    assert respuesta.status_code == 401
+
+
+async def test_admin_no_puede_eliminar_su_cuenta(
+    client: AsyncClient,
+    token_admin: str,
+) -> None:
+
+    respuesta = await client.request(
+        "DELETE",
+        URL_ELIMINAR,
+        json=DATOS_ELIMINACION,
+        headers=bearer(token_admin),
+    )
+
+    assert respuesta.status_code == 403
+
+    # El administrador sigue activo.
+    yo = await client.get(
+        "/api/v1/auth/yo",
+        headers=bearer(token_admin),
+    )
+
+    assert yo.status_code == 200
+
+
+async def test_baja_revoca_todas_las_sesiones(
+    client: AsyncClient,
+    token_cliente: str,
+) -> None:
+
+    # Creamos una segunda sesión del mismo usuario.
+    segundo_login = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "correo": "cliente@example.com",
+            "password": "Prueba123",
+        },
+    )
+
+    assert segundo_login.status_code == 200
+
+    segundo_token = segundo_login.json()["access_token"]
+
+    respuesta = await client.request(
+        "DELETE",
+        URL_ELIMINAR,
+        json=DATOS_ELIMINACION,
+        headers=bearer(token_cliente),
+    )
+
+    assert respuesta.status_code == 200
+
+    # Las dos sesiones deben quedar invalidadas.
+    for token in [token_cliente, segundo_token]:
+        yo = await client.get(
+            "/api/v1/auth/yo",
+            headers=bearer(token),
+        )
+
+        assert yo.status_code == 401
