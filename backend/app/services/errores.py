@@ -12,3 +12,6 @@ class NoEncontrado(ErrorNegocio):
 
 class Conflicto(ErrorNegocio):
     status_code = 409
+
+class Prohibido(ErrorNegocio):
+    status_code = 403
