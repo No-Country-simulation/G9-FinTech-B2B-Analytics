@@ -1,3 +1,4 @@
+from app.models.cambio_correo import CambioCorreo
 from app.models.enums import EstadoUsuario, Rol, Rubro, TipoOrganizacion, TipoToken
 from app.models.sesion import Sesion
 from app.models.solicitud_demo import SolicitudDemo
@@ -17,4 +18,5 @@ __all__ = [
     "TokenAcceso",
     "Usuario",
     "UsuarioTienda",
+    "CambioCorreo",
 ]
