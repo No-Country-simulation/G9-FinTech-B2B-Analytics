@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -65,3 +67,13 @@ class CambiarCorreoEntrada(BaseModel):
         min_length=1,
         max_length=128,
     )
+
+class EliminarCuentaEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contrasena_actual: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+
+    confirmacion: Literal["ELIMINAR MI CUENTA"]

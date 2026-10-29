@@ -8,6 +8,7 @@ from app.schemas.cuenta import (
     CambiarCorreoEntrada,
     DatosCuentaActualizar,
     DatosCuentaSalida,
+    EliminarCuentaEntrada,
 )
 from app.services import cuenta
 
@@ -128,4 +129,47 @@ async def confirmar_mi_correo(
 
     return Mensaje(
         mensaje="Correo actualizado. Iniciá sesión nuevamente."
+    )
+
+#---DAR DE BAJA LA CUENTA---
+
+@router.delete(
+    "",
+    response_model=Mensaje,
+    summary="Dar de baja mi cuenta",
+    description=(
+        "Permite al cliente autenticado solicitar la baja lógica "
+        "de su cuenta. Requiere la contraseña actual y una "
+        "confirmación explícita. Revoca sesiones y tokens pendientes."
+    ),
+    responses={
+        400: {"description": "Contraseña incorrecta o cuenta inválida"},
+        401: {"description": "No autenticado"},
+        403: {"description": "Operación no permitida"},
+        422: {"description": "Error de validación"},
+    },
+)
+async def eliminar_mi_cuenta(
+    datos: EliminarCuentaEntrada,
+    usuario: UsuarioActual,
+    db: SesionDB,
+    response: Response,
+) -> Mensaje:
+
+    await cuenta.dar_de_baja_cuenta(
+        db,
+        usuario,
+        datos,
+    )
+
+    response.delete_cookie(
+        "ps_refresh",
+        path="/api/v1/auth",
+    )
+
+    return Mensaje(
+        mensaje=(
+            "Tu cuenta fue dada de baja correctamente. "
+            "Se cerraron todas tus sesiones."
+        )
     )
