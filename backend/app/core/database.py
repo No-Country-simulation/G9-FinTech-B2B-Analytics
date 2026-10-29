@@ -7,7 +7,7 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
-CONVENCION_NOMBRES = {
+NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
@@ -15,13 +15,13 @@ CONVENCION_NOMBRES = {
     "pk": "pk_%(table_name)s",
 }
 
-_opciones = {"poolclass": NullPool} if settings.environment == "test" else {"pool_pre_ping": True}
-engine = create_async_engine(settings.database_url, **_opciones)
+_options = {"poolclass": NullPool} if settings.environment == "test" else {"pool_pre_ping": True}
+engine = create_async_engine(settings.database_url, **_options)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
-    metadata = MetaData(naming_convention=CONVENCION_NOMBRES)
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

@@ -3,43 +3,43 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models import Rol, TipoToken
-from app.schemas.comunes import Password
+from app.models import Role, TokenType
+from app.schemas.common import Password
 
 
-class LoginEntrada(BaseModel):
-    correo: EmailStr
+class LoginInput(BaseModel):
+    email: EmailStr
     password: str = Field(min_length=1, max_length=128)
 
 
-class TokenSalida(BaseModel):
+class TokenOutput(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    expira_en: int  # segundos
-    rol: Rol
+    expires_in: int  # seconds
+    role: Role
 
 
-class CorreoEntrada(BaseModel):
-    correo: EmailStr
+class EmailInput(BaseModel):
+    email: EmailStr
 
 
-class TokenEntrada(BaseModel):
+class TokenInput(BaseModel):
     token: str = Field(min_length=20, max_length=200)
 
 
-class EstadoTokenSalida(BaseModel):
-    estado: Literal["valido", "vencido", "invalido"]
-    tipo: TipoToken | None = None
+class TokenStatusOutput(BaseModel):
+    status: Literal["valid", "expired", "invalid"]
+    type: TokenType | None = None
 
 
-class DefinirPasswordEntrada(TokenEntrada):
+class SetPasswordInput(TokenInput):
     password: Password
 
 
-class UsuarioActualSalida(BaseModel):
+class CurrentUserOutput(BaseModel):
     id: uuid.UUID
-    nombre: str
-    empresa: str
-    correo: str
-    rol: Rol
-    tienda_ids: list[uuid.UUID]
+    name: str
+    company: str
+    email: str
+    role: Role
+    store_ids: list[uuid.UUID]

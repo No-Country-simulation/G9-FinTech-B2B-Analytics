@@ -1,36 +1,36 @@
 from enum import StrEnum
 
 
-class Rol(StrEnum):
-    CLIENTE = "cliente"
+class Role(StrEnum):
+    CLIENT = "client"
     ADMIN = "admin"
 
 
-class EstadoUsuario(StrEnum):
-    PENDIENTE = "pendiente"
-    ACTIVO = "activo"
-    BLOQUEADO = "bloqueado"
-    BAJA = "baja"
+class UserStatus(StrEnum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    DEACTIVATED = "deactivated"
 
 
-class TipoToken(StrEnum):
-    DEFINIR = "definir"
-    RESTABLECER = "restablecer"
+class TokenType(StrEnum):
+    SET_PASSWORD = "set_password"
+    RESET_PASSWORD = "reset_password"
 
 
-class TipoOrganizacion(StrEnum):
+class OrganizationType(StrEnum):
     RETAIL = "retail"
-    FONDO = "fondo"
-    MEDIO = "medio"
-    OTRO = "otro"
+    FUND = "fund"
+    MEDIA = "media"
+    OTHER = "other"
 
 
-class Rubro(StrEnum):
-    SUPERMERCADO = "supermercado"
-    ELECTRO = "electro"
-    MODA = "moda"
+class StoreCategory(StrEnum):
+    SUPERMARKET = "supermarket"
+    ELECTRONICS = "electronics"
+    FASHION = "fashion"
 
 
-class TipoCotizacion(StrEnum):
-    OFICIAL = "oficial"
+class RateType(StrEnum):
+    OFFICIAL = "official"
     BLUE = "blue"

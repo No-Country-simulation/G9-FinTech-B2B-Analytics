@@ -4,7 +4,7 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 
 
-async def test_documentacion_disponible() -> None:
+async def test_docs_available() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/openapi.json")
@@ -13,8 +13,8 @@ async def test_documentacion_disponible() -> None:
     assert response.json()["info"]["title"] == "PriceScope API"
 
 
-@pytest.mark.integracion
-async def test_health_con_servicios_levantados() -> None:
+@pytest.mark.integration
+async def test_health_with_services_running() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/health")

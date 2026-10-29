@@ -8,58 +8,62 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.seguridad import decodificar_access_token
-from app.models import EstadoUsuario, Rol, Sesion, Usuario
-from app.services.correo import ColaDeTareas
+from app.core.security import decode_access_token
+from app.models import Role, User, UserSession, UserStatus
+from app.services.mail import TaskQueue
 
-SesionDB = Annotated[AsyncSession, Depends(get_session)]
+DbSession = Annotated[AsyncSession, Depends(get_session)]
 
 _bearer = HTTPBearer(auto_error=False)
 
 
-def get_cola(request: Request) -> ColaDeTareas:
+def get_queue(request: Request) -> TaskQueue:
     return request.app.state.arq
 
 
-Cola = Annotated[ColaDeTareas, Depends(get_cola)]
+Queue = Annotated[TaskQueue, Depends(get_queue)]
 
 
-async def get_usuario_actual(
+async def get_current_user(
     request: Request,
-    db: SesionDB,
-    credenciales: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> Usuario:
-    no_autenticado = HTTPException(
+    db: DbSession,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User:
+    unauthenticated = HTTPException(
         status.HTTP_401_UNAUTHORIZED, "No autenticado", headers={"WWW-Authenticate": "Bearer"}
     )
-    if credenciales is None:
-        raise no_autenticado
+    if credentials is None:
+        raise unauthenticated
     try:
-        payload = decodificar_access_token(credenciales.credentials)
-        usuario_id = uuid.UUID(payload["sub"])
-        sesion_id = uuid.UUID(payload["sid"])
+        payload = decode_access_token(credentials.credentials)
+        user_id = uuid.UUID(payload["sub"])
+        session_id = uuid.UUID(payload["sid"])
     except (jwt.PyJWTError, KeyError, ValueError):
-        raise no_autenticado from None
+        raise unauthenticated from None
 
-    usuario = await db.scalar(
-        select(Usuario)
-        .join(Sesion, Sesion.usuario_id == Usuario.id)
-        .where(Usuario.id == usuario_id, Sesion.id == sesion_id, Sesion.revocada_en.is_(None))
+    user = await db.scalar(
+        select(User)
+        .join(UserSession, UserSession.user_id == User.id)
+        .where(
+            User.id == user_id,
+            UserSession.id == session_id,
+            UserSession.revoked_at.is_(None),
+        )
     )
-    if usuario is None or usuario.estado != EstadoUsuario.ACTIVO:
-        raise no_autenticado
+    if user is None or user.status != UserStatus.ACTIVE:
+        raise unauthenticated
 
-    request.state.sesion_id = sesion_id  # lo usa /auth/logout
-    return usuario
-
-
-UsuarioActual = Annotated[Usuario, Depends(get_usuario_actual)]
+    request.state.session_id = session_id  # used by /auth/logout
+    return user
 
 
-async def requiere_admin(usuario: UsuarioActual) -> Usuario:
-    if usuario.rol != Rol.ADMIN:
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_admin(user: CurrentUser) -> User:
+    if user.role != Role.ADMIN:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No tenés permisos para esta acción")
-    return usuario
+    return user
 
 
-AdminActual = Annotated[Usuario, Depends(requiere_admin)]
+CurrentAdmin = Annotated[User, Depends(require_admin)]
