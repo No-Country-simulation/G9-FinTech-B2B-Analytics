@@ -11,6 +11,7 @@ from app.models import Listing, Price, RateType
 from app.services import rates
 
 CENTS = Decimal("0.01")
+MAX_STRIKETHROUGH_RATIO = Decimal("3")
 
 
 @dataclass(frozen=True)
@@ -36,11 +37,16 @@ async def record_observation(
     if observation.current_price is None or observation.current_price <= 0:
         return None
 
-    is_promo = (
-        observation.strikethrough_price is not None
-        and observation.strikethrough_price > observation.current_price
-    )
-    regular_price = observation.strikethrough_price if is_promo else observation.current_price
+    # Some stores (e.g. Jumbo) publish a fake list price: discard it.
+    strikethrough = observation.strikethrough_price
+    if (
+        strikethrough is not None
+        and strikethrough > observation.current_price * MAX_STRIKETHROUGH_RATIO
+    ):
+        strikethrough = None
+
+    is_promo = strikethrough is not None and strikethrough > observation.current_price
+    regular_price = strikethrough if is_promo else observation.current_price
 
     listing_id = await db.scalar(
         insert(Listing)
@@ -75,7 +81,7 @@ async def record_observation(
         listing_id=listing_id,
         captured_at=captured_at or datetime.now(UTC),
         local_price=observation.current_price,
-        strikethrough_price=observation.strikethrough_price,
+        strikethrough_price=strikethrough,
         regular_price=regular_price,
         is_promo=is_promo,
         available=observation.available,
