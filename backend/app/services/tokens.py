@@ -7,75 +7,73 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.seguridad import generar_token_opaco, hash_token, hashear_password
-from app.models import EstadoUsuario, Sesion, TipoToken, TokenAcceso, Usuario
-from app.services.errores import ErrorNegocio
+from app.core.security import generate_opaque_token, hash_password, hash_token
+from app.models import AccessToken, TokenType, User, UserSession, UserStatus
+from app.services.errors import BusinessError
 
-DURACION = {
-    TipoToken.DEFINIR: timedelta(hours=settings.token_definir_horas),
-    TipoToken.RESTABLECER: timedelta(minutes=settings.token_restablecer_minutos),
+DURATIONS = {
+    TokenType.SET_PASSWORD: timedelta(hours=settings.set_password_token_hours),
+    TokenType.RESET_PASSWORD: timedelta(minutes=settings.reset_token_minutes),
 }
 
 
-async def emitir_token(db: AsyncSession, usuario_id: uuid.UUID, tipo: TipoToken) -> str:
-    """Invalida los enlaces anteriores del mismo tipo y crea uno nuevo. No hace commit."""
-    ahora = datetime.now(UTC)
+async def issue_token(db: AsyncSession, user_id: uuid.UUID, token_type: TokenType) -> str:
+    """Invalidates previous links of the same type and creates a new one. Does not commit."""
+    now = datetime.now(UTC)
     await db.execute(
-        update(TokenAcceso)
+        update(AccessToken)
         .where(
-            TokenAcceso.usuario_id == usuario_id,
-            TokenAcceso.tipo == tipo,
-            TokenAcceso.usado_en.is_(None),
+            AccessToken.user_id == user_id,
+            AccessToken.type == token_type,
+            AccessToken.used_at.is_(None),
         )
-        .values(usado_en=ahora)
+        .values(used_at=now)
     )
-    token, token_hash = generar_token_opaco()
+    token, token_hash = generate_opaque_token()
     db.add(
-        TokenAcceso(
-            usuario_id=usuario_id,
-            tipo=tipo,
+        AccessToken(
+            user_id=user_id,
+            type=token_type,
             token_hash=token_hash,
-            expira_en=ahora + DURACION[tipo],
+            expires_at=now + DURATIONS[token_type],
         )
     )
     return token
 
 
-async def estado_token(
+async def token_status(
     db: AsyncSession, token: str
-) -> tuple[Literal["valido", "vencido", "invalido"], TipoToken | None]:
-    registro = await db.scalar(
-        select(TokenAcceso).where(TokenAcceso.token_hash == hash_token(token))
+) -> tuple[Literal["valid", "expired", "invalid"], TokenType | None]:
+    record = await db.scalar(select(AccessToken).where(AccessToken.token_hash == hash_token(token)))
+    if record is None or record.used_at is not None:
+        return "invalid", None
+    if record.expires_at <= datetime.now(UTC):
+        return "expired", record.type
+    return "valid", record.type
+
+
+async def consume_token(db: AsyncSession, token: str, password: str) -> None:
+    """Sets or resets the password. Activates a pending user and closes their sessions."""
+    now = datetime.now(UTC)
+    record = await db.scalar(
+        select(AccessToken).where(AccessToken.token_hash == hash_token(token)).with_for_update()
     )
-    if registro is None or registro.usado_en is not None:
-        return "invalido", None
-    if registro.expira_en <= datetime.now(UTC):
-        return "vencido", registro.tipo
-    return "valido", registro.tipo
+    if record is None or record.used_at is not None:
+        raise BusinessError("El enlace no es válido. Pedí uno nuevo al equipo de PriceScope.")
+    if record.expires_at <= now:
+        raise BusinessError("El enlace venció. Pedí uno nuevo.")
 
+    user = await db.get(User, record.user_id)
+    if user is None or user.status in (UserStatus.BLOCKED, UserStatus.DEACTIVATED):
+        raise BusinessError("El enlace no es válido. Pedí uno nuevo al equipo de PriceScope.")
 
-async def consumir_token(db: AsyncSession, token: str, password: str) -> None:
-    """Define o restablece la contraseña. Activa al usuario pendiente y cierra sus sesiones."""
-    ahora = datetime.now(UTC)
-    registro = await db.scalar(
-        select(TokenAcceso).where(TokenAcceso.token_hash == hash_token(token)).with_for_update()
-    )
-    if registro is None or registro.usado_en is not None:
-        raise ErrorNegocio("El enlace no es válido. Pedí uno nuevo al equipo de PriceScope.")
-    if registro.expira_en <= ahora:
-        raise ErrorNegocio("El enlace venció. Pedí uno nuevo.")
-
-    usuario = await db.get(Usuario, registro.usuario_id)
-    if usuario is None or usuario.estado in (EstadoUsuario.BLOQUEADO, EstadoUsuario.BAJA):
-        raise ErrorNegocio("El enlace no es válido. Pedí uno nuevo al equipo de PriceScope.")
-
-    usuario.password_hash = await asyncio.to_thread(hashear_password, password)
-    if usuario.estado == EstadoUsuario.PENDIENTE:
-        usuario.estado = EstadoUsuario.ACTIVO
-    registro.usado_en = ahora
+    user.password_hash = await asyncio.to_thread(hash_password, password)
+    if user.status == UserStatus.PENDING:
+        user.status = UserStatus.ACTIVE
+    record.used_at = now
     await db.execute(
-        update(Sesion)
-        .where(Sesion.usuario_id == usuario.id, Sesion.revocada_en.is_(None))
-        .values(revocada_en=ahora)
+        update(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+        .values(revoked_at=now)
     )
     await db.commit()

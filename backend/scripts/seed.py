@@ -1,4 +1,4 @@
-"""Crea el primer administrador y el catálogo de tiendas. Se puede correr varias veces."""
+"""Creates the first administrator and the store catalog. Safe to run more than once."""
 
 import asyncio
 import getpass
@@ -7,69 +7,67 @@ import os
 from sqlalchemy import select
 
 from app.core.database import SessionLocal, engine
-from app.core.seguridad import hashear_password
-from app.models import EstadoUsuario, Rol, Rubro, Tienda, Usuario
-from app.schemas.comunes import validar_password
+from app.core.security import hash_password
+from app.models import Role, Store, StoreCategory, User, UserStatus
+from app.schemas.common import validate_password
 
-# Reemplazar por las tiendas reales cuando se definan los scrapers.
-TIENDAS = [
+# Replace with the real stores once the scrapers are defined.
+STORES = [
     {
-        "nombre": "Tienda A",
+        "name": "Tienda A",
         "slug": "tienda-a",
-        "url_base": "https://tienda-a.example.com",
-        "rubro": Rubro.SUPERMERCADO,
-        "scraper_clave": "tienda_a",
+        "base_url": "https://tienda-a.example.com",
+        "category": StoreCategory.SUPERMARKET,
+        "scraper_key": "tienda_a",
     },
     {
-        "nombre": "Tienda B",
+        "name": "Tienda B",
         "slug": "tienda-b",
-        "url_base": "https://tienda-b.example.com",
-        "rubro": Rubro.ELECTRO,
-        "scraper_clave": "tienda_b",
+        "base_url": "https://tienda-b.example.com",
+        "category": StoreCategory.ELECTRONICS,
+        "scraper_key": "tienda_b",
     },
     {
-        "nombre": "Tienda C",
+        "name": "Tienda C",
         "slug": "tienda-c",
-        "url_base": "https://tienda-c.example.com",
-        "rubro": Rubro.MODA,
-        "scraper_clave": "tienda_c",
+        "base_url": "https://tienda-c.example.com",
+        "category": StoreCategory.FASHION,
+        "scraper_key": "tienda_c",
     },
 ]
 
 
 async def main() -> None:
     async with SessionLocal() as db:
-        for datos in TIENDAS:
-            existe = await db.scalar(select(Tienda.id).where(Tienda.slug == datos["slug"]))
-            if not existe:
-                db.add(Tienda(**datos))
-                print(f"Tienda creada: {datos['nombre']}")
+        for data in STORES:
+            exists = await db.scalar(select(Store.id).where(Store.slug == data["slug"]))
+            if not exists:
+                db.add(Store(**data))
+                print(f"Store created: {data['name']}")
 
-        # Variables SEED_ADMIN_* permiten correrlo sin preguntas (CI, scripts).
-        correo = (
-            (os.environ.get("SEED_ADMIN_CORREO") or input("Correo del administrador: "))
-            .strip()
-            .lower()
+        # SEED_ADMIN_* variables allow running it without prompts (CI, scripts).
+        email = (
+            (os.environ.get("SEED_ADMIN_EMAIL") or input("Administrator email: ")).strip().lower()
         )
-        if await db.scalar(select(Usuario.id).where(Usuario.correo == correo)):
-            print("Ese correo ya existe; no se crea el administrador.")
+        if await db.scalar(select(User.id).where(User.email == email)):
+            print("That email already exists; no administrator created.")
         else:
-            nombre = (os.environ.get("SEED_ADMIN_NOMBRE") or input("Nombre y apellido: ")).strip()
+            name = (os.environ.get("SEED_ADMIN_NAME") or input("Full name: ")).strip()
             password = os.environ.get("SEED_ADMIN_PASSWORD") or getpass.getpass(
-                "Contraseña (8+ caracteres, una mayúscula y un número): "
+                "Password (8+ characters, one uppercase letter and one digit): "
             )
-            validar_password(password)
+            validate_password(password)
             db.add(
-                Usuario(
-                    nombre=nombre,
-                    empresa="PriceScope",
-                    correo=correo,
-                    password_hash=hashear_password(password),
-                    rol=Rol.ADMIN,
-                    estado=EstadoUsuario.ACTIVO,
+                User(
+                    name=name,
+                    company="PriceScope",
+                    email=email,
+                    password_hash=hash_password(password),
+                    role=Role.ADMIN,
+                    status=UserStatus.ACTIVE,
                 )
             )
-            print(f"Administrador creado: {correo}")
+            print(f"Administrator created: {email}")
 
         await db.commit()
     await engine.dispose()

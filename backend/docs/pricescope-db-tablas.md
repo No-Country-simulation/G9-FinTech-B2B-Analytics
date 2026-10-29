@@ -3,6 +3,8 @@
 > Esquema de PostgreSQL + TimescaleDB para las épicas en curso: **E02 · Solicitar una demo**, **E03 · Ingresar a la plataforma** y **E11 · Panel de administración v1**. E01 (landing) no tiene backend.
 >
 > Este documento es también el **esquema propuesto del spike PSB2BA-521** (vinculación usuario ↔ tiendas ↔ scrapers). Dónde va cada tabla en el código y cómo se migra está en `pricescope-backend-guia-v2.md`.
+>
+> **Nota (29/10/2026):** la migración `a3f1c9e27b40` renombró tablas, columnas y valores de enum al inglés. Las secciones de abajo siguen con los nombres originales. Equivalencias de tablas: `usuarios`→`users`, `sesiones`→`sessions`, `tokens_acceso`→`access_tokens`, `solicitudes_demo`→`demo_requests`, `tiendas`→`stores`, `usuario_tienda`→`user_store`, `cambios_correo`→`email_changes`, `cotizaciones`→`exchange_rates`, `publicaciones`→`listings`, `precios`→`prices`.
 
 ---
 

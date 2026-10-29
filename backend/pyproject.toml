@@ -1,7 +1,7 @@
 [project]
 name = "pricescrope-backend"
 version = "0.1.0"
-description = "API y pipeline de datos de PriceScope"
+description = "API and data pipeline for PriceScope"
 readme = "README.md"
 authors = [
     { name = "Angel Villalba", email = "villalb4angel@gmail.com" }
@@ -45,7 +45,7 @@ target-version = "py312"
 extend-exclude = ["migrations/versions", "docs"]
 
 [tool.ruff.lint]
-# E/F: errores básicos · I: orden de imports · B: bugs comunes · UP: sintaxis moderna
+# E/F: basic errors · I: import order · B: common bugs · UP: modern syntax
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
@@ -54,5 +54,5 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
-    "integracion: requiere Docker (base de datos y Redis) levantado",
+    "integration: requires Docker (database and Redis) to be running",
 ]

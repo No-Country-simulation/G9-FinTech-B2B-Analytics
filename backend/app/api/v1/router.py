@@ -1,22 +1,21 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    admin_cotizaciones,
-    admin_solicitudes,
-    admin_tiendas,
-    admin_usuarios,
+    account,
+    admin_demo_requests,
+    admin_rates,
+    admin_stores,
+    admin_users,
     auth,
-    cuenta,
     demo,
 )
-
 
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth.router)
 api_router.include_router(demo.router)
-api_router.include_router(cuenta.router)
-api_router.include_router(admin_solicitudes.router)
-api_router.include_router(admin_usuarios.router)
-api_router.include_router(admin_tiendas.router)
-api_router.include_router(admin_cotizaciones.router)
+api_router.include_router(account.router)
+api_router.include_router(admin_demo_requests.router)
+api_router.include_router(admin_users.router)
+api_router.include_router(admin_stores.router)
+api_router.include_router(admin_rates.router)

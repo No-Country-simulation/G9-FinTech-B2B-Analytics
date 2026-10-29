@@ -1,104 +1,102 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
-from app.api.deps import Cola, SesionDB, UsuarioActual
+from app.api.deps import CurrentUser, DbSession, Queue
 from app.core.config import settings
 from app.schemas.auth import (
-    CorreoEntrada,
-    DefinirPasswordEntrada,
-    EstadoTokenSalida,
-    LoginEntrada,
-    TokenEntrada,
-    TokenSalida,
-    UsuarioActualSalida,
+    CurrentUserOutput,
+    EmailInput,
+    LoginInput,
+    SetPasswordInput,
+    TokenInput,
+    TokenOutput,
+    TokenStatusOutput,
 )
-from app.schemas.comunes import Mensaje
-from app.services import autenticacion, tiendas, tokens, usuarios
+from app.schemas.common import Message
+from app.services import authentication, stores, tokens, users
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 COOKIE_REFRESH = "ps_refresh"
-RUTA_COOKIE = "/api/v1/auth"
+COOKIE_PATH = "/api/v1/auth"
 
 
-def _guardar_refresh(response: Response, refresh: str) -> None:
+def _save_refresh(response: Response, refresh: str) -> None:
     response.set_cookie(
         COOKIE_REFRESH,
         refresh,
         httponly=True,
-        secure=settings.cookies_seguras,
+        secure=settings.secure_cookies,
         samesite="lax",
-        max_age=settings.sesion_duracion_max_horas * 3600,
-        path=RUTA_COOKIE,
+        max_age=settings.session_max_hours * 3600,
+        path=COOKIE_PATH,
     )
 
 
-def _token_salida(access: str, rol: str) -> TokenSalida:
-    return TokenSalida(access_token=access, expira_en=settings.access_token_minutos * 60, rol=rol)
+def _token_output(access: str, role: str) -> TokenOutput:
+    return TokenOutput(
+        access_token=access, expires_in=settings.access_token_minutes * 60, role=role
+    )
 
 
-@router.post("/login", response_model=TokenSalida)
+@router.post("/login", response_model=TokenOutput)
 async def login(
-    datos: LoginEntrada, request: Request, response: Response, db: SesionDB
-) -> TokenSalida:
-    usuario = await autenticacion.autenticar(db, datos.correo, datos.password)
-    if usuario is None:
+    data: LoginInput, request: Request, response: Response, db: DbSession
+) -> TokenOutput:
+    user = await authentication.authenticate(db, data.email, data.password)
+    if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Correo o contraseña incorrectos")
-    access, refresh = await autenticacion.abrir_sesion(
-        db, usuario, request.headers.get("user-agent")
-    )
-    _guardar_refresh(response, refresh)
-    return _token_salida(access, usuario.rol)
+    access, refresh = await authentication.open_session(db, user, request.headers.get("user-agent"))
+    _save_refresh(response, refresh)
+    return _token_output(access, user.role)
 
 
-@router.post("/refresh", response_model=TokenSalida)
-async def refresh(request: Request, response: Response, db: SesionDB) -> TokenSalida:
+@router.post("/refresh", response_model=TokenOutput)
+async def refresh(request: Request, response: Response, db: DbSession) -> TokenOutput:
     token = request.cookies.get(COOKIE_REFRESH)
-    resultado = await autenticacion.renovar_sesion(db, token) if token else None
-    if resultado is None:
+    result = await authentication.refresh_session(db, token) if token else None
+    if result is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tu sesión venció. Ingresá de nuevo.")
-    usuario, access, nuevo_refresh = resultado
-    _guardar_refresh(response, nuevo_refresh)
-    return _token_salida(access, usuario.rol)
+    user, access, new_refresh = result
+    _save_refresh(response, new_refresh)
+    return _token_output(access, user.role)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(
-    request: Request, response: Response, usuario: UsuarioActual, db: SesionDB
-) -> None:
-    await autenticacion.cerrar_sesion(db, request.state.sesion_id)
-    response.delete_cookie(COOKIE_REFRESH, path=RUTA_COOKIE)
+async def logout(request: Request, response: Response, user: CurrentUser, db: DbSession) -> None:
+    await authentication.close_session(db, request.state.session_id)
+    response.delete_cookie(COOKIE_REFRESH, path=COOKIE_PATH)
 
 
-@router.get("/yo", response_model=UsuarioActualSalida)
-async def yo(usuario: UsuarioActual, db: SesionDB) -> UsuarioActualSalida:
-    ids = [t.id for t in await tiendas.tiendas_de_usuario(db, usuario.id)]
-    return UsuarioActualSalida(
-        id=usuario.id,
-        nombre=usuario.nombre,
-        empresa=usuario.empresa,
-        correo=usuario.correo,
-        rol=usuario.rol,
-        tienda_ids=ids,
+@router.get("/me", response_model=CurrentUserOutput)
+async def me(user: CurrentUser, db: DbSession) -> CurrentUserOutput:
+    store_ids = [s.id for s in await stores.stores_of_user(db, user.id)]
+    return CurrentUserOutput(
+        id=user.id,
+        name=user.name,
+        company=user.company,
+        email=user.email,
+        role=user.role,
+        store_ids=store_ids,
     )
 
 
-@router.post("/token/verificar", response_model=EstadoTokenSalida)
-async def verificar_token(datos: TokenEntrada, db: SesionDB) -> EstadoTokenSalida:
-    estado, tipo = await tokens.estado_token(db, datos.token)
-    return EstadoTokenSalida(estado=estado, tipo=tipo)
+@router.post("/token/verify", response_model=TokenStatusOutput)
+async def verify_token(data: TokenInput, db: DbSession) -> TokenStatusOutput:
+    token_state, token_type = await tokens.token_status(db, data.token)
+    return TokenStatusOutput(status=token_state, type=token_type)
 
 
-@router.post("/password", response_model=Mensaje)
-async def definir_password(datos: DefinirPasswordEntrada, db: SesionDB) -> Mensaje:
-    await tokens.consumir_token(db, datos.token, datos.password)
-    return Mensaje(mensaje="Tu contraseña quedó guardada. Ya podés ingresar.")
+@router.post("/password", response_model=Message)
+async def set_password(data: SetPasswordInput, db: DbSession) -> Message:
+    await tokens.consume_token(db, data.token, data.password)
+    return Message(message="Tu contraseña quedó guardada. Ya podés ingresar.")
 
 
-@router.post("/recuperar", response_model=Mensaje, status_code=status.HTTP_202_ACCEPTED)
-async def recuperar(datos: CorreoEntrada, db: SesionDB, cola: Cola) -> Mensaje:
-    await usuarios.solicitar_recuperacion(db, cola, datos.correo)
-    return Mensaje(
-        mensaje=(
+@router.post("/recover", response_model=Message, status_code=status.HTTP_202_ACCEPTED)
+async def recover(data: EmailInput, db: DbSession, queue: Queue) -> Message:
+    await users.request_password_reset(db, queue, data.email)
+    return Message(
+        message=(
             "Si el correo corresponde a una cuenta, "
             "te enviamos un enlace para restablecer la contraseña."
         )

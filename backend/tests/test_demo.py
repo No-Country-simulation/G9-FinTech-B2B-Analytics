@@ -6,47 +6,45 @@ from httpx import AsyncClient
 from tests.conftest import bearer
 
 AR = ZoneInfo("America/Argentina/Buenos_Aires")
-URL_PUBLICA = "/api/v1/demo/solicitudes"
-URL_ADMIN = "/api/v1/admin/solicitudes"
+URL_PUBLIC = "/api/v1/demo/requests"
+URL_ADMIN = "/api/v1/admin/demo-requests"
 
 
-def proximo_dia(habil: bool) -> str:
-    dia = datetime.now(AR) + timedelta(days=1)
-    while (dia.weekday() < 5) != habil:
-        dia += timedelta(days=1)
-    return dia.replace(hour=10, minute=0, second=0, microsecond=0).isoformat()
+def next_day(business_day: bool) -> str:
+    day = datetime.now(AR) + timedelta(days=1)
+    while (day.weekday() < 5) != business_day:
+        day += timedelta(days=1)
+    return day.replace(hour=10, minute=0, second=0, microsecond=0).isoformat()
 
 
-def datos(**cambios: object) -> dict:
+def data(**changes: object) -> dict:
     base = {
-        "empresa": "Supermercados del Sur",
-        "nombre": "Ana Pérez",
-        "correo": "Ana@Example.com",
-        "tipo_organizacion": "retail",
-        "fecha_preferida": proximo_dia(habil=True),
+        "company": "Supermercados del Sur",
+        "name": "Ana Pérez",
+        "email": "Ana@Example.com",
+        "organization_type": "retail",
+        "preferred_date": next_day(business_day=True),
     }
-    return base | cambios
+    return base | changes
 
 
-async def test_visitante_crea_solicitud(client: AsyncClient) -> None:
-    respuesta = await client.post(URL_PUBLICA, json=datos())
-    assert respuesta.status_code == 201
-    assert respuesta.json()["correo"] == "ana@example.com"
+async def test_visitor_creates_request(client: AsyncClient) -> None:
+    response = await client.post(URL_PUBLIC, json=data())
+    assert response.status_code == 201
+    assert response.json()["email"] == "ana@example.com"
 
 
-async def test_rechaza_fin_de_semana(client: AsyncClient) -> None:
-    respuesta = await client.post(URL_PUBLICA, json=datos(fecha_preferida=proximo_dia(habil=False)))
-    assert respuesta.status_code == 422
+async def test_rejects_weekend(client: AsyncClient) -> None:
+    response = await client.post(URL_PUBLIC, json=data(preferred_date=next_day(business_day=False)))
+    assert response.status_code == 422
 
 
-async def test_listado_solo_para_admin(
-    client: AsyncClient, token_cliente: str, token_admin: str
-) -> None:
-    await client.post(URL_PUBLICA, json=datos())
+async def test_list_is_admin_only(client: AsyncClient, client_token: str, admin_token: str) -> None:
+    await client.post(URL_PUBLIC, json=data())
 
     assert (await client.get(URL_ADMIN)).status_code == 401
-    assert (await client.get(URL_ADMIN, headers=bearer(token_cliente))).status_code == 403
+    assert (await client.get(URL_ADMIN, headers=bearer(client_token))).status_code == 403
 
-    respuesta = await client.get(URL_ADMIN, headers=bearer(token_admin))
-    assert respuesta.status_code == 200
-    assert respuesta.json()["total"] == 1
+    response = await client.get(URL_ADMIN, headers=bearer(admin_token))
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
