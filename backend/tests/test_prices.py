@@ -88,3 +88,19 @@ async def test_same_listing_is_reused() -> None:
         await record_observation(db, observation(store_id, current_price=Decimal("800")))
         assert await db.scalar(select(func.count()).select_from(Listing)) == 1
         assert await db.scalar(select(func.count()).select_from(Price)) == 2
+
+
+async def test_absurd_strikethrough_is_discarded() -> None:
+    store_id = await prepare()
+    async with SessionLocal() as db:
+        price = await record_observation(
+            db,
+            observation(
+                store_id, current_price=Decimal("5208"), strikethrough_price=Decimal("430413")
+            ),
+        )
+
+    assert price is not None
+    assert price.is_promo is False
+    assert price.strikethrough_price is None
+    assert price.regular_price == Decimal("5208")

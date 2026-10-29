@@ -14,25 +14,18 @@ from app.schemas.common import validate_password
 # Replace with the real stores once the scrapers are defined.
 STORES = [
     {
-        "name": "Tienda A",
-        "slug": "tienda-a",
-        "base_url": "https://tienda-a.example.com",
+        "name": "Carrefour Argentina",
+        "slug": "carrefour",
+        "base_url": "https://www.carrefour.com.ar",
         "category": StoreCategory.SUPERMARKET,
-        "scraper_key": "tienda_a",
+        "scraper_key": "carrefour",
     },
     {
-        "name": "Tienda B",
-        "slug": "tienda-b",
-        "base_url": "https://tienda-b.example.com",
-        "category": StoreCategory.ELECTRONICS,
-        "scraper_key": "tienda_b",
-    },
-    {
-        "name": "Tienda C",
-        "slug": "tienda-c",
-        "base_url": "https://tienda-c.example.com",
-        "category": StoreCategory.FASHION,
-        "scraper_key": "tienda_c",
+        "name": "Jumbo Argentina",
+        "slug": "jumbo",
+        "base_url": "https://www.jumbo.com.ar",
+        "category": StoreCategory.SUPERMARKET,
+        "scraper_key": "jumbo",
     },
 ]
 
