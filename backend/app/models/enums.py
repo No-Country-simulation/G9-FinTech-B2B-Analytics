@@ -29,3 +29,8 @@ class Rubro(StrEnum):
     SUPERMERCADO = "supermercado"
     ELECTRO = "electro"
     MODA = "moda"
+
+
+class TipoCotizacion(StrEnum):
+    OFICIAL = "oficial"
+    BLUE = "blue"

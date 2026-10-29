@@ -1,5 +1,16 @@
+
 from app.models.cambio_correo import CambioCorreo
-from app.models.enums import EstadoUsuario, Rol, Rubro, TipoOrganizacion, TipoToken
+from app.models.cotizacion import Cotizacion
+from app.models.enums import (
+    EstadoUsuario,
+    Rol,
+    Rubro,
+    TipoCotizacion,
+    TipoOrganizacion,
+    TipoToken,
+)
+from app.models.precio import Precio
+from app.models.publicacion import Publicacion
 from app.models.sesion import Sesion
 from app.models.solicitud_demo import SolicitudDemo
 from app.models.tienda import Tienda, UsuarioTienda
@@ -19,4 +30,8 @@ __all__ = [
     "Usuario",
     "UsuarioTienda",
     "CambioCorreo",
+    "TipoCotizacion",
+    "Cotizacion",
+    "Publicacion",
+    "Precio",
 ]
