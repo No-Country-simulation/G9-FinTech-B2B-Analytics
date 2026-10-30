@@ -82,8 +82,13 @@ async def me(user: CurrentUser, db: DbSession) -> CurrentUserOutput:
 
 @router.post("/token/verify", response_model=TokenStatusOutput)
 async def verify_token(data: TokenInput, db: DbSession) -> TokenStatusOutput:
-    token_state, token_type = await tokens.token_status(db, data.token)
-    return TokenStatusOutput(status=token_state, type=token_type)
+    token_state, token_type, owner = await tokens.token_status(db, data.token)
+    return TokenStatusOutput(
+        status=token_state,
+        type=token_type,
+        email=owner.email if owner else None,
+        company=owner.company if owner else None,
+    )
 
 
 @router.post("/password", response_model=Message)

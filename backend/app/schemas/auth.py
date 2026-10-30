@@ -30,6 +30,9 @@ class TokenInput(BaseModel):
 class TokenStatusOutput(BaseModel):
     status: Literal["valid", "expired", "invalid"]
     type: TokenType | None = None
+    # Only for a valid link.
+    email: str | None = None
+    company: str | None = None
 
 
 class SetPasswordInput(TokenInput):

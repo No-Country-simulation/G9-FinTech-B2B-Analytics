@@ -32,3 +32,12 @@ class UserOutput(BaseModel):
 class UserCreatedOutput(BaseModel):
     user: UserOutput
     email_queued: bool
+
+
+class UserEmailInput(BaseModel):
+    email: EmailStr
+
+
+class UserEmailChangedOutput(BaseModel):
+    user: UserOutput
+    email_queued: bool

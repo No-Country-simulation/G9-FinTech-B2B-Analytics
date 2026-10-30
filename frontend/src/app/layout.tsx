@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight, Newsreader } from "next/font/google";
+import { Geist, Inter, Inter_Tight, Newsreader } from "next/font/google";
 import "./globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
+const geist = Geist({
+  variable: "--font-sans",
+  subsets: ["latin"],
+});
+
+// Inter, Inter Tight and Newsreader are still used by the pages that predate
+// shadcn (/, /demo, /registro) until they are migrated.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -29,9 +38,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es-AR"
-      className={`${inter.variable} ${interTight.variable} ${newsreader.variable} h-full antialiased`}
+      className={cn(
+        "h-full font-sans antialiased",
+        geist.variable,
+        inter.variable,
+        interTight.variable,
+        newsreader.variable,
+      )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }
