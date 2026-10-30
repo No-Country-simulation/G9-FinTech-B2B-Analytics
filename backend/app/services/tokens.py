@@ -43,13 +43,14 @@ async def issue_token(db: AsyncSession, user_id: uuid.UUID, token_type: TokenTyp
 
 async def token_status(
     db: AsyncSession, token: str
-) -> tuple[Literal["valid", "expired", "invalid"], TokenType | None]:
+) -> tuple[Literal["valid", "expired", "invalid"], TokenType | None, User | None]:
+    """The owner is returned only for a valid link, so the page can greet them."""
     record = await db.scalar(select(AccessToken).where(AccessToken.token_hash == hash_token(token)))
     if record is None or record.used_at is not None:
-        return "invalid", None
+        return "invalid", None, None
     if record.expires_at <= datetime.now(UTC):
-        return "expired", record.type
-    return "valid", record.type
+        return "expired", record.type, None
+    return "valid", record.type, await db.get(User, record.user_id)
 
 
 async def consume_token(db: AsyncSession, token: str, password: str) -> None:

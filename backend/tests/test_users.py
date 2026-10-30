@@ -42,6 +42,8 @@ async def test_full_flow_create_set_password_login(
 
     verified = await client.post("/api/v1/auth/token/verify", json={"token": token})
     assert verified.json()["status"] == "valid"
+    assert verified.json()["email"] == "carla@example.com"
+    assert verified.json()["company"] == NEW_USER["company"]
 
     defined = await client.post(
         "/api/v1/auth/password", json={"token": token, "password": "Carla2026"}

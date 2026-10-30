@@ -7,7 +7,13 @@ from app.api.deps import CurrentAdmin, DbSession, Queue
 from app.models import Role, User, UserStatus
 from app.schemas.common import Message, Page
 from app.schemas.stores import AssignStoreInput, StoreOutput
-from app.schemas.users import UserCreate, UserCreatedOutput, UserOutput
+from app.schemas.users import (
+    UserCreate,
+    UserCreatedOutput,
+    UserEmailChangedOutput,
+    UserEmailInput,
+    UserOutput,
+)
 from app.services import stores, users
 
 router = APIRouter(prefix="/admin/users", tags=["admin · users"])
@@ -59,6 +65,46 @@ async def resend_access(
     if not queued:
         return Message(message="No pudimos enviar el correo. Probá de nuevo en unos minutos.")
     return Message(message="Enviamos un nuevo correo de acceso.")
+
+
+@router.post(
+    "/{user_id}/password-reset", response_model=Message, status_code=status.HTTP_202_ACCEPTED
+)
+async def send_password_reset(
+    user_id: uuid.UUID, db: DbSession, queue: Queue, _admin: CurrentAdmin
+) -> Message:
+    queued = await users.send_password_reset(db, queue, user_id)
+    if not queued:
+        return Message(message="No pudimos enviar el correo. Probá de nuevo en unos minutos.")
+    return Message(message="Enviamos un enlace para restablecer la contraseña.")
+
+
+@router.patch("/{user_id}/email", response_model=UserEmailChangedOutput)
+async def change_email(
+    user_id: uuid.UUID, data: UserEmailInput, db: DbSession, queue: Queue, _admin: CurrentAdmin
+) -> UserEmailChangedOutput:
+    user, queued = await users.change_email(db, queue, user_id, data.email)
+    return UserEmailChangedOutput(
+        user=_output(user, await users.count_stores(db, user_id)), email_queued=queued
+    )
+
+
+@router.post("/{user_id}/block", response_model=UserOutput)
+async def block_user(user_id: uuid.UUID, db: DbSession, admin: CurrentAdmin) -> UserOutput:
+    user = await users.block_user(db, user_id, admin.id)
+    return _output(user, await users.count_stores(db, user_id))
+
+
+@router.post("/{user_id}/unblock", response_model=UserOutput)
+async def unblock_user(user_id: uuid.UUID, db: DbSession, _admin: CurrentAdmin) -> UserOutput:
+    user = await users.unblock_user(db, user_id)
+    return _output(user, await users.count_stores(db, user_id))
+
+
+@router.post("/{user_id}/deactivate", response_model=UserOutput)
+async def deactivate_user(user_id: uuid.UUID, db: DbSession, admin: CurrentAdmin) -> UserOutput:
+    user = await users.deactivate_user(db, user_id, admin.id)
+    return _output(user, await users.count_stores(db, user_id))
 
 
 @router.get("/{user_id}/stores", response_model=list[StoreOutput])
